@@ -1,17 +1,11 @@
-
-/*
-  Simple Clean-Architecture like structure inside one file
-  - Repositories: SpotRepository, LocationRepository, AudioService
-  - UseCases: GetSpotsUseCase, StartNavigationUseCase, UpdatePositionUseCase
-  - Controllers: UI wiring and state
-*/
-
 const SHEET_URL = "https://opensheet.elk.sh/1NSJYoopyQnyA-yCGduNlLgUxxGqBYvI8h89xhahHaMQ/シート1";
-// If you have a write endpoint (Google Apps Script WebApp or your API), put it here.
-// Example: const WRITE_ENDPOINT = 'https://script.google.com/macros/s/XXX/exec';
-const WRITE_ENDPOINT = '';
 
 /* ---------- Repositories / Services ---------- */
+/**
+ * SpotRepository
+ * - スプレッドシート (SHEET_URL) からスポット一覧を取得し、正規化して返す
+ * - 返却するオブジェクト: { id, name, desc, lat, lng, image, radius }
+ */
 const SpotRepository = {
     async getSpots() {
         try {
@@ -52,23 +46,17 @@ const LocationRepository = {
     }
 };
 
-/* Measurement repository: attempts to POST measurement to WRITE_ENDPOINT. If not configured,
-   falls back to storing per-spot measurements in localStorage under key 'measurement_<spotId>'. */
+/**
+ * MeasurementRepository
+ * - 計測値を保存するためのリポジトリ。WRITE_ENDPOINT が設定されていれば POST、
+ *   なければ localStorage にフォールバックする
+ */
 const MeasurementRepository = {
     async saveMeasurement(spotId, payload) {
         try {
-            if (WRITE_ENDPOINT) {
-                const res = await fetch(WRITE_ENDPOINT, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ spotId, ...payload })
-                });
-                return res.ok;
-            } else {
-                // fallback: localStorage
-                const key = `measurement_${spotId}`;
-                localStorage.setItem(key, JSON.stringify(payload));
-                return true;
-            }
+            const key = `measurement_${spotId}`;
+            localStorage.setItem(key, JSON.stringify(payload));
+            return true;
         } catch (e) {
             console.error('saveMeasurement failed', e);
             return false;
@@ -76,10 +64,6 @@ const MeasurementRepository = {
     },
     getLastMeasurement(spotId) {
         try {
-            if (WRITE_ENDPOINT) {
-                // no read API implemented; caller should fetch from server if needed
-                return null;
-            }
             const key = `measurement_${spotId}`;
             const raw = localStorage.getItem(key);
             return raw ? JSON.parse(raw) : null;
@@ -87,6 +71,10 @@ const MeasurementRepository = {
     }
 };
 
+/**
+ * AudioService
+ * - ナビ時に使う簡易的な WebAudio ヘルパー
+ */
 const AudioService = {
     ctx: null,
     osc: null,
@@ -127,10 +115,17 @@ const AudioService = {
 };
 
 /* ---------- UseCases ---------- */
-const GetSpotsUseCase = {
-    execute: async () => await SpotRepository.getSpots()
-};
+/**
+ * GetSpotsUseCase
+ * - スポット一覧を取得して返すユースケース
+ */
+const GetSpotsUseCase = { execute: async () => await SpotRepository.getSpots() };
 
+/**
+ * UpdatePositionUseCase
+ * - 現在位置とスポットの距離を計算し、音声パターンと到着判定を返す
+ * - 戻り値: { distance, pattern, arrived }
+ */
 const UpdatePositionUseCase = {
     execute: (coords, spot) => {
         const d = calculateDistance(coords.latitude, coords.longitude, spot.lat, spot.lng);
@@ -139,74 +134,76 @@ const UpdatePositionUseCase = {
     }
 };
 
+/**
+ * decidePattern(distance, radius)
+ * - 距離に応じたビープの間隔・周波数・音量を決定する
+ */
 function decidePattern(distance, radius) {
-    // closer -> faster and higher pitch
     const clamped = Math.max(1, distance);
-    const interval = Math.max(180, clamped * 3); // ms
+    const interval = Math.max(180, clamped * 3);
     const freq = Math.min(1200, Math.max(400, 1200 - clamped));
     const volume = Math.min(0.9, Math.max(0.08, 1 - (clamped / Math.max(radius, 200))));
     return { interval, freq, volume };
 }
 
-function getCurrentPositionPromise() {
-    // Try strategies: 1) high accuracy getCurrentPosition (10s)
-    // 2) low accuracy getCurrentPosition (10s)
-    // 3) watchPosition until first fix (15s overall)
+/**
+ * tryGetPositionOnce(options)
+ * - 指定オプションで一度だけ getCurrentPosition を試すヘルパー
+ * - 成功時は coords を返す、失敗時はエラーを投げる
+ */
+function tryGetPositionOnce(options) {
     return new Promise((resolve, reject) => {
-        if (!('geolocation' in navigator)) return reject(new Error('Geolocation not supported'));
-
-        const tryOnce = (options) => new Promise((res, rej) => {
-            navigator.geolocation.getCurrentPosition(p => res(p.coords), e => rej(e), options);
-        });
-
-        (async () => {
-            try {
-                console.debug('[geo] try high-accuracy getCurrentPosition');
-                const c = await tryOnce({ enableHighAccuracy: true, timeout: 10000 });
-                console.debug('[geo] high-accuracy success');
-                return resolve(c);
-            } catch (e1) {
-                console.debug('[geo] high-accuracy failed', e1 && e1.code, e1 && e1.message);
-                // If user denied permission, stop immediately
-                if (e1 && e1.code === 1) return reject(e1);
-                // otherwise, fall through to try lower accuracy
-            }
-
-            try {
-                console.debug('[geo] try low-accuracy getCurrentPosition');
-                const c = await tryOnce({ enableHighAccuracy: false, timeout: 10000 });
-                console.debug('[geo] low-accuracy success');
-                return resolve(c);
-            } catch (e2) {
-                console.debug('[geo] low-accuracy failed', e2 && e2.code, e2 && e2.message);
-                if (e2 && e2.code === 1) return reject(e2);
-                // fallback to watchPosition: wait for first position or overall timeout
-                let done = false;
-                const overallTimer = setTimeout(() => {
-                    if (done) return;
-                    done = true;
-                    try { if (watchId != null) navigator.geolocation.clearWatch(watchId); } catch (_) { }
-                    reject(new Error('Timeout expired'));
-                }, 20000);
-
-                let watchId = navigator.geolocation.watchPosition(pos => {
-                    if (done) return;
-                    done = true;
-                    clearTimeout(overallTimer);
-                    try { navigator.geolocation.clearWatch(watchId); } catch (_) { }
-                    console.debug('[geo] watchPosition got position');
-                    resolve(pos.coords);
-                }, err => {
-                    if (done) return;
-                    done = true;
-                    clearTimeout(overallTimer);
-                    try { if (watchId != null) navigator.geolocation.clearWatch(watchId); } catch (_) { }
-                    console.debug('[geo] watchPosition error', err && err.code, err && err.message);
-                    reject(err);
-                }, { enableHighAccuracy: false, maximumAge: 0 });
-            }
-        })();
+        navigator.geolocation.getCurrentPosition(p => resolve(p.coords), e => reject(e), options);
     });
+}
+
+/**
+ * watchPositionFirst(timeoutMs)
+ * - watchPosition を使って最初の位置を取得する（指定時間でタイムアウト）
+ */
+function watchPositionFirst(timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+        let done = false;
+        const overallTimer = setTimeout(() => {
+            if (done) return;
+            done = true;
+            try { if (watchId != null) navigator.geolocation.clearWatch(watchId); } catch (_) { }
+            reject(new Error('Timeout expired'));
+        }, timeoutMs);
+
+        let watchId = navigator.geolocation.watchPosition(pos => {
+            if (done) return;
+            done = true;
+            clearTimeout(overallTimer);
+            try { navigator.geolocation.clearWatch(watchId); } catch (_) { }
+            resolve(pos.coords);
+        }, err => {
+            if (done) return;
+            done = true;
+            clearTimeout(overallTimer);
+            try { if (watchId != null) navigator.geolocation.clearWatch(watchId); } catch (_) { }
+            reject(err);
+        }, { enableHighAccuracy: false, maximumAge: 0 });
+    });
+}
+
+/**
+ * getCurrentPositionPromise()
+ * - 高精度→低精度→watch の順で位置取得を試みる
+ */
+async function getCurrentPositionPromise() {
+    if (!('geolocation' in navigator)) throw new Error('Geolocation not supported');
+    try {
+        return await tryGetPositionOnce({ enableHighAccuracy: true, timeout: 10000 });
+    } catch (e1) {
+        if (e1 && e1.code === 1) throw e1; // permission denied
+    }
+    try {
+        return await tryGetPositionOnce({ enableHighAccuracy: false, timeout: 10000 });
+    } catch (e2) {
+        if (e2 && e2.code === 1) throw e2;
+        return await watchPositionFirst(20000);
+    }
 }
 
 const StartNavigationUseCase = {
@@ -244,26 +241,7 @@ const els = {
     recordDeltaBtn: document.getElementById('recordDeltaBtn')
 };
 
-const geoStatusEl = document.getElementById('geoStatus');
 
-async function updateGeoStatus() {
-    try {
-        const origin = location.origin || window.location.href;
-        let text = `Page origin: ${origin}`;
-        if (navigator.permissions && navigator.permissions.query) {
-            try {
-                const p = await navigator.permissions.query({ name: 'geolocation' });
-                text += `\nPermission: ${p.state}`;
-                p.onchange = () => updateGeoStatus();
-            } catch (e) {
-                text += `\nPermission: unknown`;
-            }
-        } else {
-            text += `\nPermission API not supported`;
-        }
-        if (geoStatusEl) geoStatusEl.innerText = text;
-    } catch (e) { /* ignore */ }
-}
 
 function showScreen(name) {
     els.titleScreen.classList.toggle('hidden', name !== 'title');
@@ -276,46 +254,17 @@ async function init() {
     const spots = await GetSpotsUseCase.execute();
     appState.spots = spots;
     renderSpots(spots);
-    updateGeoStatus();
 }
 
-async function requestGeoPermission() {
-    try {
-        if (!('geolocation' in navigator)) {
-            alert('このブラウザは位置情報に対応していません');
-            return;
-        }
-        // Trigger a getCurrentPosition on user gesture to prompt browser permission dialog
-        try {
-            const coords = await getCurrentPositionPromise();
-            alert('位置取得に成功しました');
-            updateGeoStatus();
-            console.debug('[geo] user gesture position', coords);
-        } catch (e) {
-            console.debug('[geo] permission request result', e && e.code, e && e.message);
-            updateGeoStatus();
-            alert('位置情報の取得に失敗しました（許可が必要です）');
-        }
-    } catch (e) { console.error(e); }
-}
 
+
+/**
+ * renderSpots(spots)
+ * - スポットの配列を受け取り、選択画面にスポットカードを表示する
+ */
 function renderSpots(spots) {
     els.spotsGrid.innerHTML = '';
-    spots.forEach((s, i) => {
-        const card = document.createElement('div');
-        card.className = 'spot-card';
-        card.innerHTML = `
-            <img src="${s.image}" alt="${escapeHtml(s.name)}" />
-            <div class="meta">
-                <div class="name">${escapeHtml(s.name)}</div>
-                <div class="desc">${escapeHtml(s.desc)}</div>
-            </div>`;
-        card.addEventListener('click', () => {
-            appState.selectedIndex = i;
-            document.querySelectorAll('.spot-card').forEach((el, idx) => el.style.outline = idx === i ? '3px solid rgba(3,82,89,0.14)' : 'none');
-        });
-        els.spotsGrid.appendChild(card);
-    });
+    spots.forEach((s, i) => els.spotsGrid.appendChild(createSpotCard(s, i)));
     // preselect first
     if (spots.length > 0) {
         appState.selectedIndex = 0;
@@ -323,37 +272,85 @@ function renderSpots(spots) {
     }
 }
 
-function attachEvents() {
-    els.startBtn.addEventListener('click', () => showScreen('selection'));
-    els.backToTitle.addEventListener('click', () => showScreen('title'));
-    const reqBtn = document.getElementById('requestGeoBtn');
-    if (reqBtn) reqBtn.addEventListener('click', () => requestGeoPermission());
-    els.toNavBtn.addEventListener('click', () => {
-        const idx = appState.selectedIndex;
-        if (idx == null) { alert('スポットを選んでください'); return; }
-        const spot = appState.spots[idx];
-        startNavigation(spot);
+/**
+ * createSpotCard(spot, index)
+ * - スポットカード要素を作成して返す
+ */
+function createSpotCard(spot, index) {
+    const card = document.createElement('div');
+    card.className = 'spot-card';
+    card.innerHTML = `
+        <img src="${spot.image}" alt="${escapeHtml(spot.name)}" />
+        <div class="meta">
+            <div class="name">${escapeHtml(spot.name)}</div>
+            <div class="desc">${escapeHtml(spot.desc)}</div>
+        </div>`;
+    card.addEventListener('click', () => {
+        appState.selectedIndex = index;
+        document.querySelectorAll('.spot-card').forEach((el, idx) => el.style.outline = idx === index ? '3px solid rgba(3,82,89,0.14)' : 'none');
     });
-    els.backToSelection.addEventListener('click', () => {
-        stopNavigation();
-        showScreen('selection');
-    });
-    els.recordDeltaBtn.addEventListener('click', async () => {
-        const idx = appState.selectedIndex;
-        if (idx == null) { els.deltaDisplay.textContent = 'スポットが選択されていません'; return; }
-        const spot = appState.spots[idx];
-        try {
-            els.deltaDisplay.textContent = '測位中...';
-            const coords = await getCurrentPositionPromise();
-            const d = Math.floor(calculateDistance(coords.latitude, coords.longitude, spot.lat, spot.lng));
-            els.deltaDisplay.textContent = `${d} m`;
-        } catch (e) {
-            console.error('position get failed', e);
-            els.deltaDisplay.textContent = '現在位置の取得に失敗しました';
-        }
-    });
+    return card;
 }
 
+/**
+ * attachEvents
+ * - Wire main UI buttons and the distance calculation button
+ */
+function attachEvents() {
+    els.startBtn.addEventListener('click', handleStart);
+    els.backToTitle.addEventListener('click', handleBackToTitle);
+    els.toNavBtn.addEventListener('click', handleToNav);
+    els.backToSelection.addEventListener('click', handleBackToSelection);
+    els.recordDeltaBtn.addEventListener('click', handleRecordDelta);
+}
+
+/**
+ * handleStart - タイトル画面のスタートボタン (選択画面へ遷移)
+ */
+function handleStart() { showScreen('selection'); }
+
+/**
+ * handleBackToTitle - 選択画面からタイトルへ戻る
+ */
+function handleBackToTitle() { showScreen('title'); }
+
+/**
+ * handleToNav - 選択したスポットでナビを開始する
+ */
+function handleToNav() {
+    const idx = appState.selectedIndex;
+    if (idx == null) { alert('スポットを選んでください'); return; }
+    const spot = appState.spots[idx];
+    startNavigation(spot);
+}
+
+/**
+ * handleBackToSelection - ナビ画面から選択画面へ戻す（ナビ停止）
+ */
+function handleBackToSelection() { stopNavigation(); showScreen('selection'); }
+
+/**
+ * handleRecordDelta - 現在位置を取得してスポットまでの距離を計算し表示する
+ */
+async function handleRecordDelta() {
+    const idx = appState.selectedIndex;
+    if (idx == null) { els.deltaDisplay.textContent = 'スポットが選択されていません'; return; }
+    const spot = appState.spots[idx];
+    try {
+        els.deltaDisplay.textContent = '測位中...';
+        const coords = await getCurrentPositionPromise();
+        const d = Math.floor(calculateDistance(coords.latitude, coords.longitude, spot.lat, spot.lng));
+        els.deltaDisplay.textContent = `${d} m`;
+    } catch (e) {
+        console.error('position get failed', e);
+        els.deltaDisplay.textContent = '現在位置の取得に失敗しました';
+    }
+}
+
+/**
+ * startNavigation(spot)
+ * - Show nav UI and start watching position
+ */
 function startNavigation(spot) {
     showNavSpot(spot);
     showScreen('nav');
@@ -376,6 +373,10 @@ function startNavigation(spot) {
     });
 }
 
+/**
+ * stopNavigation
+ * - Stop watchers and audio
+ */
 function stopNavigation() {
     if (appState.watchId) {
         LocationRepository.clearWatch(appState.watchId);
@@ -383,21 +384,34 @@ function stopNavigation() {
     }
     AudioService.stopInterval();
     appState.beeping = false;
-    // toggleBeepBtn was removed from UI; ensure we don't touch undefined elements
-    if (els.toggleBeepBtn) els.toggleBeepBtn.textContent = 'ビープ開始';
 }
 
+/**
+ * showNavSpot(spot)
+ * - Populate navigation screen with spot data
+ */
+/**
+ * showNavSpot(spot)
+ * - ナビ画面に選択スポットの情報を表示する
+ */
 function showNavSpot(spot) {
     if (els.navSpotImage) els.navSpotImage.src = spot.image;
     if (els.navSpotName) els.navSpotName.textContent = spot.name;
     if (els.navSpotDesc) els.navSpotDesc.textContent = spot.desc;
     if (els.navTitle) els.navTitle.textContent = 'ナビ — ' + spot.name;
-    // distanceDisplay was removed from UI by design; do not attempt to set it.
     if (els.deltaDisplay) els.deltaDisplay.textContent = '-- m';
 }
 
+/**
+ * escapeHtml(s)
+ * - 簡易サニタイズ: テキストを HTML に挿入する前にエスケープする
+ */
 function escapeHtml(s) { return String(s).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+/**
+ * calculateDistance(lat1, lon1, lat2, lon2)
+ * - ハーサイン（Haversine）式で 2 点間の距離（メートル）を返す
+ */
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -413,4 +427,3 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 // boot
 attachEvents();
 init();
-
