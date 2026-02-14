@@ -17,10 +17,8 @@
         <section id="titleScreen" class="screen">
             <div class="title-wrap">
                 <h1 class="app-title">イタバシクン</h1>
-                <div class="title-actions">
-                    <button id="startBtn" class="btn primary">スタート</button>
-                    <button id="requestGeoBtn" class="btn secondary">位置情報を許可</button>
-                </div>
+                <p class="lead">位置情報をONにしてスタートしてください。</p>
+                <button id="startBtn" class="btn primary">スタート</button>
             </div>
         </section>
 
@@ -32,7 +30,7 @@
             </header>
             <div id="spotsGrid" class="grid"></div>
             <div class="actions">
-                <button id="toNavBtn" class="btn primary">次へ（選択して続行）</button>
+                <button id="toNavBtn" class="btn primary">次へ</button>
             </div>
         </section>
 
@@ -44,7 +42,7 @@
             </header>
 
             <div class="nav-content">
-                <div id="geoStatus" class="geo-status"></div>
+                <!-- geoStatus removed -->
                 <div class="spot-card large" id="navSpotCard">
                     <img id="navSpotImage" src="" alt="spot" />
                     <div class="spot-info">
