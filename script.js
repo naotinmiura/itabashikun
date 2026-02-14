@@ -244,6 +244,27 @@ const els = {
     recordDeltaBtn: document.getElementById('recordDeltaBtn')
 };
 
+const geoStatusEl = document.getElementById('geoStatus');
+
+async function updateGeoStatus() {
+    try {
+        const origin = location.origin || window.location.href;
+        let text = `Page origin: ${origin}`;
+        if (navigator.permissions && navigator.permissions.query) {
+            try {
+                const p = await navigator.permissions.query({ name: 'geolocation' });
+                text += `\nPermission: ${p.state}`;
+                p.onchange = () => updateGeoStatus();
+            } catch (e) {
+                text += `\nPermission: unknown`;
+            }
+        } else {
+            text += `\nPermission API not supported`;
+        }
+        if (geoStatusEl) geoStatusEl.innerText = text;
+    } catch (e) { /* ignore */ }
+}
+
 function showScreen(name) {
     els.titleScreen.classList.toggle('hidden', name !== 'title');
     els.selectionScreen.classList.toggle('hidden', name !== 'selection');
@@ -255,6 +276,27 @@ async function init() {
     const spots = await GetSpotsUseCase.execute();
     appState.spots = spots;
     renderSpots(spots);
+    updateGeoStatus();
+}
+
+async function requestGeoPermission() {
+    try {
+        if (!('geolocation' in navigator)) {
+            alert('このブラウザは位置情報に対応していません');
+            return;
+        }
+        // Trigger a getCurrentPosition on user gesture to prompt browser permission dialog
+        try {
+            const coords = await getCurrentPositionPromise();
+            alert('位置取得に成功しました');
+            updateGeoStatus();
+            console.debug('[geo] user gesture position', coords);
+        } catch (e) {
+            console.debug('[geo] permission request result', e && e.code, e && e.message);
+            updateGeoStatus();
+            alert('位置情報の取得に失敗しました（許可が必要です）');
+        }
+    } catch (e) { console.error(e); }
 }
 
 function renderSpots(spots) {
@@ -284,6 +326,8 @@ function renderSpots(spots) {
 function attachEvents() {
     els.startBtn.addEventListener('click', () => showScreen('selection'));
     els.backToTitle.addEventListener('click', () => showScreen('title'));
+    const reqBtn = document.getElementById('requestGeoBtn');
+    if (reqBtn) reqBtn.addEventListener('click', () => requestGeoPermission());
     els.toNavBtn.addEventListener('click', () => {
         const idx = appState.selectedIndex;
         if (idx == null) { alert('スポットを選んでください'); return; }
