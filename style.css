@@ -15,7 +15,9 @@ body {
     background: linear-gradient(180deg, #f8fcfc 0%, #ffffff 100%);
     color: #042424;
     margin: 0;
-    padding: 24px
+    padding: 24px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .screen {
@@ -35,7 +37,8 @@ body {
     padding: 48px 24px;
     border-radius: var(--rounded);
     background: linear-gradient(180deg, rgba(3, 82, 89, 0.06), rgba(3, 82, 89, 0.02));
-    box-shadow: var(--shadow)
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(3, 82, 89, 0.04);
 }
 
 .app-title {
@@ -47,7 +50,8 @@ body {
 .lead {
     color: #215f5d;
     max-width: 680px;
-    text-align: center
+    text-align: center;
+    font-size: 15px;
 }
 
 .btn {
@@ -61,7 +65,13 @@ body {
 .btn.primary {
     background: var(--main);
     color: white;
-    box-shadow: 0 8px 20px rgba(3, 82, 89, 0.18)
+    box-shadow: 0 8px 20px rgba(3, 82, 89, 0.18);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.btn.primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 36px rgba(3, 82, 89, 0.14);
 }
 
 .btn.secondary {
@@ -103,11 +113,12 @@ body {
     gap: 12px;
     align-items: center;
     cursor: pointer;
-    transition: transform .12s ease, box-shadow .12s ease
+    transition: transform .18s cubic-bezier(.2, .9, .3, 1), box-shadow .12s ease;
 }
 
 .spot-card:hover {
-    transform: translateY(-6px)
+    transform: translateY(-6px);
+    box-shadow: 0 18px 42px rgba(3, 82, 89, 0.08);
 }
 
 .spot-card img {
@@ -175,9 +186,10 @@ body {
 }
 
 .metric-value {
-    font-size: 20px;
-    font-weight: 700;
-    margin-top: 6px
+    font-size: 24px;
+    font-weight: 800;
+    margin-top: 6px;
+    color: var(--main);
 }
 
 .nav-actions {
