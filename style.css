@@ -1,0 +1,230 @@
+:root {
+    --main: #035259;
+    --muted: #f3f6f5;
+    --accent: #ffaa33;
+    --rounded: 12px;
+    --shadow: 0 6px 18px rgba(3, 82, 89, 0.12);
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: linear-gradient(180deg, #f8fcfc 0%, #ffffff 100%);
+    color: #042424;
+    margin: 0;
+    padding: 24px
+}
+
+.screen {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.hidden {
+    display: none
+}
+
+.title-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 48px 24px;
+    border-radius: var(--rounded);
+    background: linear-gradient(180deg, rgba(3, 82, 89, 0.06), rgba(3, 82, 89, 0.02));
+    box-shadow: var(--shadow)
+}
+
+.app-title {
+    font-size: 36px;
+    color: var(--main);
+    margin: 0
+}
+
+.lead {
+    color: #215f5d;
+    max-width: 680px;
+    text-align: center
+}
+
+.btn {
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600
+}
+
+.btn.primary {
+    background: var(--main);
+    color: white;
+    box-shadow: 0 8px 20px rgba(3, 82, 89, 0.18)
+}
+
+.btn.secondary {
+    background: #e9f5f4;
+    color: var(--main);
+    border: 1px solid rgba(3, 82, 89, 0.08)
+}
+
+.btn.ghost {
+    background: transparent;
+    color: var(--main);
+    border: 1px solid rgba(3, 82, 89, 0.06)
+}
+
+.screen-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px
+}
+
+.screen-header h2 {
+    margin: 0;
+    color: var(--main)
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px
+}
+
+.spot-card {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease
+}
+
+.spot-card:hover {
+    transform: translateY(-6px)
+}
+
+.spot-card img {
+    width: 86px;
+    height: 86px;
+    border-radius: 8px;
+    object-fit: cover
+}
+
+.spot-card .meta {
+    display: flex;
+    flex-direction: column
+}
+
+.spot-card .name {
+    font-weight: 700;
+    color: #033;
+}
+
+.spot-card .desc {
+    font-size: 13px;
+    color: #667
+}
+
+.spot-card.large {
+    display: flex;
+    gap: 18px;
+    padding: 18px
+}
+
+.spot-card.large img {
+    width: 140px;
+    height: 100px;
+    border-radius: 8px
+}
+
+.spot-info h3 {
+    margin: 0;
+    color: var(--main)
+}
+
+.spot-info p {
+    margin: 6px 0 0;
+    color: #456
+}
+
+.metrics {
+    display: flex;
+    gap: 20px;
+    align-items: stretch;
+    margin-top: 18px
+}
+
+.metric {
+    background: var(--muted);
+    padding: 14px;
+    border-radius: 12px;
+    flex: 1;
+    text-align: center
+}
+
+.metric label {
+    font-size: 13px;
+    color: #567
+}
+
+.metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 6px
+}
+
+.nav-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 18px
+}
+
+.actions {
+    text-align: center;
+    margin-top: 16px
+}
+
+@media (max-width:600px) {
+    .app-title {
+        font-size: 28px
+    }
+
+    .grid {
+        grid-template-columns: 1fr
+    }
+
+    .metrics {
+        flex-direction: column
+    }
+
+    /* Mobile specific touch targets */
+    body {
+        padding: 16px
+    }
+
+    .title-wrap {
+        padding: 32px 16px
+    }
+
+    .btn {
+        padding: 14px 18px;
+        font-size: 17px;
+        border-radius: 14px
+    }
+
+    .spot-card img {
+        width: 96px;
+        height: 96px
+    }
+
+    .spot-card .name {
+        font-size: 16px
+    }
+}

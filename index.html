@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>イタバシクン</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <meta name="color-scheme" content="light">
+</head>
+
+<body>
+
+    <div id="app">
+
+        <!-- Title Screen -->
+        <section id="titleScreen" class="screen">
+            <div class="title-wrap">
+                <h1 class="app-title">イタバシクン</h1>
+                <button id="startBtn" class="btn primary">スタート</button>
+            </div>
+        </section>
+
+        <!-- Spot Selection Screen -->
+        <section id="selectionScreen" class="screen hidden">
+            <header class="screen-header">
+                <button id="backToTitle" class="btn ghost">戻る</button>
+                <h2>スポットを選ぶ</h2>
+            </header>
+            <div id="spotsGrid" class="grid"></div>
+            <div class="actions">
+                <button id="toNavBtn" class="btn primary">次へ（選択して続行）</button>
+            </div>
+        </section>
+
+        <!-- Navigation Screen -->
+        <section id="navScreen" class="screen hidden">
+            <header class="screen-header">
+                <button id="backToSelection" class="btn ghost">戻る</button>
+                <h2 id="navTitle">ナビ</h2>
+            </header>
+
+            <div class="nav-content">
+                <div class="spot-card large" id="navSpotCard">
+                    <img id="navSpotImage" src="" alt="spot" />
+                    <div class="spot-info">
+                        <h3 id="navSpotName"></h3>
+                        <p id="navSpotDesc"></p>
+                    </div>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <label>前回差分</label>
+                        <div id="deltaDisplay" class="metric-value">-- m</div>
+                    </div>
+                </div>
+
+                <div class="nav-actions">
+                    <button id="recordDeltaBtn" class="btn primary">距離を計算</button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
